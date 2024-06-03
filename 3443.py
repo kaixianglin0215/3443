@@ -225,8 +225,8 @@ KBar_df['MA_long'] = KBar_df['close'].rolling(window=LongMAPeriod).mean()
 KBar_df['MA_short'] = KBar_df['close'].rolling(window=ShortMAPeriod).mean()
 
 #### 尋找最後 NAN值的位置
-last_nan_index_MA = KBar_df['MA_long'][::-1].index[KBar_df['MA_long'][::-1].apply(pd.isna)][0]
-
+if not KBar_df['MA_long'].empty:
+    last_nan_index_MA = KBar_df['MA_long'][::-1].index[KBar_df['MA_long'][::-1].apply(pd.isna)][0]
 
 
 #####  (ii) RSI 策略   #####
@@ -253,7 +253,8 @@ KBar_df['RSI_short'] = calculate_rsi(KBar_df, ShortRSIPeriod)
 KBar_df['RSI_Middle']=np.array([50]*len(KBar_dic['time']))
 
 ### 尋找最後 NAN值的位置
-last_nan_index_RSI = KBar_df['RSI_long'][::-1].index[KBar_df['RSI_long'][::-1].apply(pd.isna)][0]
+if not KBar_df['RSI_long'].empty:
+    last_nan_index_RSI = KBar_df['RSI_long'][::-1].index[KBar_df['RSI_long'][::-1].apply(pd.isna)][0]
 
 
 # #### 逆勢策略
