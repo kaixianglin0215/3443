@@ -12,7 +12,6 @@ import pandas as pd
 import streamlit as st 
 import streamlit.components.v1 as stc 
 import streamlit as st
-import talib
 
 ###### (1) 開始設定 ######
 html_temp = """
@@ -326,12 +325,6 @@ df['signal_momentum'] = 0
 df['signal_momentum'] = np.where(df['momentum'] > 0, 1, -1)
 df['position_momentum'] = df['signal_momentum'].diff()
 
-# MACD 策略
-df['MACD'], df['MACD_signal'], df['MACD_hist'] = talib.MACD(df['close'], fastperiod=12, slowperiod=26, signalperiod=9)
-df['signal_MACD'] = 0
-df['signal_MACD'] = np.where(df['MACD'] > df['MACD_signal'], 1, -1)
-df['position_MACD'] = df['signal_MACD'].diff()
-
 # KDJ 指标
 low_list = df['low'].rolling(window=9).min()
 low_list.fillna(value=df['low'].expanding().min(), inplace=True)
@@ -364,18 +357,6 @@ with st.expander("动量策略"):
     fig5.add_trace(go.Scatter(x=df['time'], y=df['momentum'], mode='lines', line=dict(color='orange', width=2), name='動量'), secondary_y=False)
     fig5.layout.yaxis2.showgrid = True
     st.plotly_chart(fig5, use_container_width=True)
-
-# MACD 策略图
-with st.expander("MACD 策略"):
-    fig6 = make_subplots(specs=[[{"secondary_y": True}]])
-    fig6.add_trace(go.Candlestick(x=df['time'],
-                    open=df['open'], high=df['high'],
-                    low=df['low'], close=df['close'], name='K線'),
-                   secondary_y=True)
-    fig6.add_trace(go.Scatter(x=df['time'], y=df['MACD'], mode='lines', line=dict(color='blue', width=2), name='MACD'), secondary_y=False)
-    fig6.add_trace(go.Scatter(x=df['time'], y=df['MACD_signal'], mode='lines', line=dict(color='red', width=2), name='MACD信號線'), secondary_y=False)
-    fig6.layout.yaxis2.showgrid = True
-    st.plotly_chart(fig6, use_container_width=True)
 
 # KDJ 策略图
 with st.expander("KDJ 策略"):
