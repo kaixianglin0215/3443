@@ -49,6 +49,7 @@ if 'Unnamed: 0' in df_original.columns:
 #df.tail()
 #type(df['time'][0])
 
+df_original['time'] = pd.to_datetime(df_original['time'])
 
 ##### 選擇資料區間
 st.subheader("選擇開始與結束的日期, 區間:2019-01-01 至 2024-04-30")
