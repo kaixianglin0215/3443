@@ -32,7 +32,7 @@ stc.html(html_temp)
 # df_original.to_pickle('kbars_2330_2022-01-01-2022-11-18.pkl')
 
 ## 读取Pickle文件
-df_original = pd.read_pickle('kbars_2330_2022-01-01-2022-11-18.pkl')
+df_original = pd.read_pickle('testdata3443.pkl')
 
 
 #df.columns  ## Index(['Unnamed: 0', 'time', 'open', 'low', 'high', 'close', 'volume','amount'], dtype='object')
@@ -47,9 +47,9 @@ df_original = df_original.drop('Unnamed: 0',axis=1)
 
 
 ##### 選擇資料區間
-st.subheader("選擇開始與結束的日期, 區間:2022-01-03 至 2022-11-18")
-start_date = st.text_input('選擇開始日期 (日期格式: 2022-01-03)', '2022-01-03')
-end_date = st.text_input('選擇結束日期 (日期格式: 2022-11-18)', '2022-11-18')
+st.subheader("選擇開始與結束的日期, 區間:2019-01 至 2024-04")
+start_date = st.text_input('選擇開始日期 (日期格式: 2019-01)', '2024-04')
+end_date = st.text_input('選擇結束日期 (日期格式: 2024-04)', '2024-04')
 start_date = datetime.datetime.strptime(start_date,'%Y-%m-%d')
 end_date = datetime.datetime.strptime(end_date,'%Y-%m-%d')
 # 使用条件筛选选择时间区间的数据
@@ -310,7 +310,7 @@ with st.expander("K線圖, 長短 RSI"):
     fig2.layout.yaxis2.showgrid=True
     st.plotly_chart(fig2, use_container_width=True)
     
-# 布林带策略
+# 布林通道
 df['middle_band'] = df['close'].rolling(window=20).mean()
 df['std_dev'] = df['close'].rolling(window=20).std()
 df['upper_band'] = df['middle_band'] + (df['std_dev'] * 2)
@@ -318,12 +318,6 @@ df['lower_band'] = df['middle_band'] - (df['std_dev'] * 2)
 df['signal_BB'] = 0
 df['signal_BB'] = np.where(df['close'] > df['upper_band'], -1, np.where(df['close'] < df['lower_band'], 1, 0))
 df['position_BB'] = df['signal_BB'].diff()
-
-# 动量策略
-df['momentum'] = df['close'].diff(5)
-df['signal_momentum'] = 0
-df['signal_momentum'] = np.where(df['momentum'] > 0, 1, -1)
-df['position_momentum'] = df['signal_momentum'].diff()
 
 # KDJ 指标
 low_list = df['low'].rolling(window=9).min()
@@ -335,8 +329,8 @@ df['K'] = rsv.ewm(com=2).mean()
 df['D'] = df['K'].ewm(com=2).mean()
 df['J'] = 3 * df['K'] - 2 * df['D']
 
-# 布林带策略图
-with st.expander("布林带策略"):
+# 布林通到圖
+with st.expander("布林通道策略"):
     fig4 = make_subplots(specs=[[{"secondary_y": True}]])
     fig4.add_trace(go.Candlestick(x=df['time'],
                     open=df['open'], high=df['high'],
@@ -347,16 +341,6 @@ with st.expander("布林带策略"):
     fig4.layout.yaxis2.showgrid = True
     st.plotly_chart(fig4, use_container_width=True)
 
-# 动量策略图
-with st.expander("动量策略"):
-    fig5 = make_subplots(specs=[[{"secondary_y": True}]])
-    fig5.add_trace(go.Candlestick(x=df['time'],
-                    open=df['open'], high=df['high'],
-                    low=df['low'], close=df['close'], name='K線'),
-                   secondary_y=True)
-    fig5.add_trace(go.Scatter(x=df['time'], y=df['momentum'], mode='lines', line=dict(color='orange', width=2), name='動量'), secondary_y=False)
-    fig5.layout.yaxis2.showgrid = True
-    st.plotly_chart(fig5, use_container_width=True)
 
 # KDJ 策略图
 with st.expander("KDJ 策略"):
