@@ -11,7 +11,7 @@ import datetime
 import pandas as pd
 import streamlit as st 
 import streamlit.components.v1 as stc 
-import streamlit as st
+
 
 ###### (1) 開始設定 ######
 html_temp = """
@@ -22,8 +22,8 @@ html_temp = """
 		"""
 stc.html(html_temp)
 
-#df = pd.read_excel("kbars_台積電_1100701_1100708_2.xlsx")
-#df = pd.read_excel("kbars_2330_2022-07-01-2022-07-31.xlsx")
+#df = pd.read_excel("testdata3443.pkl")
+#df = pd.read_excel("testdata3443.xlsx")
 
 # ## 讀取 excel 檔
 # df_original = pd.read_excel("kbars_2330_2022-01-01-2022-11-18.xlsx")
@@ -32,12 +32,14 @@ stc.html(html_temp)
 # df_original.to_pickle('kbars_2330_2022-01-01-2022-11-18.pkl')
 
 ## 读取Pickle文件
+@st.cache_data(ttl=3600,show_spinner="正在加載資料")
+def load_data(url):
+    df = pd.read_pickle(url)
+    return df
 df_original = pd.read_pickle('testdata3443.pkl')
 
-
 #df.columns  ## Index(['Unnamed: 0', 'time', 'open', 'low', 'high', 'close', 'volume','amount'], dtype='object')
-if 'Unnamed: 0' in df_original.columns:
-    df_original = df_original.drop('Unnamed: 0', axis=1)
+df_original = df_original.drop('Unnamed: 0',axis=1)
 #df.columns  ## Index(['time', 'open', 'low', 'high', 'close', 'volume', 'amount'], dtype='object')
 #df['time']
 #type(df['time'])  ## pandas.core.series.Series
@@ -113,15 +115,23 @@ KBar_dic['amount']=np.array(KBar_amount_list)
 
 Date = start_date.strftime("%Y-%m-%d")
 
+st.subheader("設定一根 K 棒的時間長度(分鐘)")
+import streamlit as st
+
+# 让用户选择时间单位的选项
 time_units = ["分鐘", "小時", "天"]
 selected_unit = st.selectbox("选择时间单位", time_units)
+
+# 根据用户选择的时间单位进行转换
 if selected_unit == "分钟":
     unit_conversion = 1
 elif selected_unit == "小时":
     unit_conversion = 60
 else:
-    unit_conversion = 1440 
-cycle_duration = st.number_input('輸入一根 K 棒的時間長度(單位:分鐘, 一日=1440分鐘)', key="KBar_duration")
+    unit_conversion = 1440
+
+# 获取用户输入的 K 棒时间长度
+cycle_duration = st.number_input('输入一根 K 棒的时间长度（单位：{}）'.format(selected_unit), value=1, key="KBar_duration") * unit_conversion
 cycle_duration = int(cycle_duration)
 #cycle_duration = 1440   ## 可以改成你想要的 KBar 週期
 #KBar = indicator_f_Lo2.KBar(Date,'time',2)
@@ -295,7 +305,7 @@ with st.expander("K線圖, 移動平均線"):
 
 
 ##### K線圖, RSI
-with st.expander("K線圖, 長短 RSI"):
+with st.expander("長短 RSI"):
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
     #### include candlestick with rangeselector
     fig2.add_trace(go.Candlestick(x=KBar_df['Time'],
@@ -310,51 +320,102 @@ with st.expander("K線圖, 長短 RSI"):
     
     fig2.layout.yaxis2.showgrid=True
     st.plotly_chart(fig2, use_container_width=True)
+
+
+
+
+
+
+print(KBar_df.columns)
+
+
+# 計算KDJ指標
+def calculate_kdj(df, n=9, m1=3, m2=3):
+    df['low_min'] = df['Low'].rolling(window=n, min_periods=1).min()
+    df['high_max'] = df['High'].rolling(window=n, min_periods=1).max()
+    df['rsv'] = (df['Close'] - df['low_min']) / (df['high_max'] - df['low_min']) * 100
+    df['k'] = df['rsv'].ewm(com=m1 - 1, adjust=False).mean()
+    df['d'] = df['k'].ewm(com=m2 - 1, adjust=False).mean()
+    df['j'] = 3 * df['k'] - 2 * df['d']
+    df.drop(['low_min', 'high_max', 'rsv'], axis=1, inplace=True)
+
+# 將KDJ指標添加到KBar DataFrame中
+calculate_kdj(KBar_df)
+
+# 設置實單交易策略
+def trading_strategy(df):
+    df['buy_signal'] = (df['k'] > df['d']) & (df['k'].shift(1) < df['d'].shift(1))
+    df['sell_signal'] = (df['k'] < df['d']) & (df['k'].shift(1) > df['d'].shift(1))
+    # 根據實單交易策略執行相應的交易操作，這裡可以添加您的交易程式碼
+
+# 執行交易策略
+trading_strategy(KBar_df)
+
+# 繪製包含KDJ指標和交易信號的圖表
+with st.expander("K線圖, KDJ指標, 實單交易策略"):
+    fig3 = make_subplots(specs=[[{"secondary_y": True}]])
     
-# 布林通道
-df['middle_band'] = df['close'].rolling(window=20).mean()
-df['std_dev'] = df['close'].rolling(window=20).std()
-df['upper_band'] = df['middle_band'] + (df['std_dev'] * 2)
-df['lower_band'] = df['middle_band'] - (df['std_dev'] * 2)
-df['signal_BB'] = 0
-df['signal_BB'] = np.where(df['close'] > df['upper_band'], -1, np.where(df['close'] < df['lower_band'], 1, 0))
-df['position_BB'] = df['signal_BB'].diff()
-
-# KDJ 指标
-low_list = df['low'].rolling(window=9).min()
-low_list.fillna(value=df['low'].expanding().min(), inplace=True)
-high_list = df['high'].rolling(window=9).max()
-high_list.fillna(value=df['high'].expanding().max(), inplace=True)
-rsv = (df['close'] - low_list) / (high_list - low_list) * 100
-df['K'] = rsv.ewm(com=2).mean()
-df['D'] = df['K'].ewm(com=2).mean()
-df['J'] = 3 * df['K'] - 2 * df['D']
-
-# 布林通到圖
-with st.expander("布林通道策略"):
-    fig4 = make_subplots(specs=[[{"secondary_y": True}]])
-    fig4.add_trace(go.Candlestick(x=df['time'],
-                    open=df['open'], high=df['high'],
-                    low=df['low'], close=df['close'], name='K線'),
+    # K線圖
+    fig3.add_trace(go.Candlestick(x=KBar_df['Time'],
+                    open=KBar_df['Open'], high=KBar_df['High'],
+                    low=KBar_df['Low'], close=KBar_df['Close'], name='K線'),
                    secondary_y=True)
-    fig4.add_trace(go.Scatter(x=df['time'], y=df['upper_band'], mode='lines', line=dict(color='green', width=2), name='上軌道'), secondary_y=True)
-    fig4.add_trace(go.Scatter(x=df['time'], y=df['lower_band'], mode='lines', line=dict(color='green', width=2), name='下軌道'), secondary_y=True)
-    fig4.layout.yaxis2.showgrid = True
+    
+    # KDJ指標
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['k'], mode='lines',line=dict(color='blue', width=2), name='K'), 
+                  secondary_y=False)
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['d'], mode='lines',line=dict(color='red', width=2), name='D'), 
+                  secondary_y=False)
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['j'], mode='lines',line=dict(color='green', width=2), name='J'), 
+                  secondary_y=False)
+    
+    # 交易信號
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['Close'], mode='markers', marker=dict(color='green', size=8), 
+                               name='買入信號', customdata=KBar_df['buy_signal']), secondary_y=True)
+    fig3.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['Close'], mode='markers', marker=dict(color='red', size=8), 
+                               name='賣出信號', customdata=KBar_df['sell_signal']), secondary_y=True)
+    
+    fig3.layout.yaxis2.showgrid=True
+    st.plotly_chart(fig3, use_container_width=True)
+
+
+
+# 計算布林通道指標
+def calculate_bollinger_bands(df, window=20, num_std_dev=2):
+    df['MA'] = df['Close'].rolling(window=window).mean()
+    df['std_dev'] = df['Close'].rolling(window=window).std()
+    df['upper_band'] = df['MA'] + (num_std_dev * df['std_dev'])
+    df['lower_band'] = df['MA'] - (num_std_dev * df['std_dev'])
+
+# 添加布林通道指標到KBar DataFrame中
+calculate_bollinger_bands(KBar_df)
+
+# 繪製包含布林通道指標的圖表
+with st.expander("K線圖, 布林通道"):
+    fig4 = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # K線圖
+    fig4.add_trace(go.Candlestick(x=KBar_df['Time'],
+                    open=KBar_df['Open'], high=KBar_df['High'],
+                    low=KBar_df['Low'], close=KBar_df['Close'], name='K線'),
+                   secondary_y=True)
+    
+    # 布林通道
+    fig4.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['upper_band'], mode='lines',line=dict(color='orange', width=2), name='Upper Band'), 
+                  secondary_y=False)
+    fig4.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['MA'], mode='lines',line=dict(color='blue', width=2), name='MA'), 
+                  secondary_y=False)
+    fig4.add_trace(go.Scatter(x=KBar_df['Time'], y=KBar_df['lower_band'], mode='lines',line=dict(color='purple', width=2), name='Lower Band'), 
+                  secondary_y=False)
+    
+    fig4.layout.yaxis2.showgrid=True
     st.plotly_chart(fig4, use_container_width=True)
 
 
-# KDJ 策略图
-with st.expander("KDJ 策略"):
-    fig7 = make_subplots(specs=[[{"secondary_y": True}]])
-    fig7.add_trace(go.Candlestick(x=df['time'],
-                    open=df['open'], high=df['high'],
-                    low=df['low'], close=df['close'], name='K線'),
-                   secondary_y=True)
-    fig7.add_trace(go.Scatter(x=df['time'], y=df['K'], mode='lines', line=dict(color='blue', width=2), name='K'), secondary_y=False)
-    fig7.add_trace(go.Scatter(x=df['time'], y=df['D'], mode='lines', line=dict(color='red', width=2), name='D'), secondary_y=False)
-    fig7.add_trace(go.Scatter(x=df['time'], y=df['J'], mode='lines', line=dict(color='green', width=2), name='J'), secondary_y=False)
-    fig7.layout.yaxis2.showgrid = True
-    st.plotly_chart(fig7, use_container_width=True)
+
+
+
+
 
 
 
