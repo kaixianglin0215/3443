@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st 
 import streamlit.components.v1 as stc 
 import streamlit as st
+import talib
 
 ###### (1) 開始設定 ######
 html_temp = """
@@ -309,6 +310,85 @@ with st.expander("K線圖, 長短 RSI"):
     
     fig2.layout.yaxis2.showgrid=True
     st.plotly_chart(fig2, use_container_width=True)
+    
+# 布林带策略
+df['middle_band'] = df['close'].rolling(window=20).mean()
+df['std_dev'] = df['close'].rolling(window=20).std()
+df['upper_band'] = df['middle_band'] + (df['std_dev'] * 2)
+df['lower_band'] = df['middle_band'] - (df['std_dev'] * 2)
+df['signal_BB'] = 0
+df['signal_BB'] = np.where(df['close'] > df['upper_band'], -1, np.where(df['close'] < df['lower_band'], 1, 0))
+df['position_BB'] = df['signal_BB'].diff()
+
+# 动量策略
+df['momentum'] = df['close'].diff(5)
+df['signal_momentum'] = 0
+df['signal_momentum'] = np.where(df['momentum'] > 0, 1, -1)
+df['position_momentum'] = df['signal_momentum'].diff()
+
+# MACD 策略
+df['MACD'], df['MACD_signal'], df['MACD_hist'] = talib.MACD(df['close'], fastperiod=12, slowperiod=26, signalperiod=9)
+df['signal_MACD'] = 0
+df['signal_MACD'] = np.where(df['MACD'] > df['MACD_signal'], 1, -1)
+df['position_MACD'] = df['signal_MACD'].diff()
+
+# KDJ 指标
+low_list = df['low'].rolling(window=9).min()
+low_list.fillna(value=df['low'].expanding().min(), inplace=True)
+high_list = df['high'].rolling(window=9).max()
+high_list.fillna(value=df['high'].expanding().max(), inplace=True)
+rsv = (df['close'] - low_list) / (high_list - low_list) * 100
+df['K'] = rsv.ewm(com=2).mean()
+df['D'] = df['K'].ewm(com=2).mean()
+df['J'] = 3 * df['K'] - 2 * df['D']
+
+# 布林带策略图
+with st.expander("布林带策略"):
+    fig4 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig4.add_trace(go.Candlestick(x=df['time'],
+                    open=df['open'], high=df['high'],
+                    low=df['low'], close=df['close'], name='K線'),
+                   secondary_y=True)
+    fig4.add_trace(go.Scatter(x=df['time'], y=df['upper_band'], mode='lines', line=dict(color='green', width=2), name='上軌道'), secondary_y=True)
+    fig4.add_trace(go.Scatter(x=df['time'], y=df['lower_band'], mode='lines', line=dict(color='green', width=2), name='下軌道'), secondary_y=True)
+    fig4.layout.yaxis2.showgrid = True
+    st.plotly_chart(fig4, use_container_width=True)
+
+# 动量策略图
+with st.expander("动量策略"):
+    fig5 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig5.add_trace(go.Candlestick(x=df['time'],
+                    open=df['open'], high=df['high'],
+                    low=df['low'], close=df['close'], name='K線'),
+                   secondary_y=True)
+    fig5.add_trace(go.Scatter(x=df['time'], y=df['momentum'], mode='lines', line=dict(color='orange', width=2), name='動量'), secondary_y=False)
+    fig5.layout.yaxis2.showgrid = True
+    st.plotly_chart(fig5, use_container_width=True)
+
+# MACD 策略图
+with st.expander("MACD 策略"):
+    fig6 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig6.add_trace(go.Candlestick(x=df['time'],
+                    open=df['open'], high=df['high'],
+                    low=df['low'], close=df['close'], name='K線'),
+                   secondary_y=True)
+    fig6.add_trace(go.Scatter(x=df['time'], y=df['MACD'], mode='lines', line=dict(color='blue', width=2), name='MACD'), secondary_y=False)
+    fig6.add_trace(go.Scatter(x=df['time'], y=df['MACD_signal'], mode='lines', line=dict(color='red', width=2), name='MACD信號線'), secondary_y=False)
+    fig6.layout.yaxis2.showgrid = True
+    st.plotly_chart(fig6, use_container_width=True)
+
+# KDJ 策略图
+with st.expander("KDJ 策略"):
+    fig7 = make_subplots(specs=[[{"secondary_y": True}]])
+    fig7.add_trace(go.Candlestick(x=df['time'],
+                    open=df['open'], high=df['high'],
+                    low=df['low'], close=df['close'], name='K線'),
+                   secondary_y=True)
+    fig7.add_trace(go.Scatter(x=df['time'], y=df['K'], mode='lines', line=dict(color='blue', width=2), name='K'), secondary_y=False)
+    fig7.add_trace(go.Scatter(x=df['time'], y=df['D'], mode='lines', line=dict(color='red', width=2), name='D'), secondary_y=False)
+    fig7.add_trace(go.Scatter(x=df['time'], y=df['J'], mode='lines', line=dict(color='green', width=2), name='J'), secondary_y=False)
+    fig7.layout.yaxis2.showgrid = True
+    st.plotly_chart(fig7, use_container_width=True)
 
 
 
