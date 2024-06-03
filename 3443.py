@@ -11,7 +11,7 @@ import datetime
 import pandas as pd
 import streamlit as st 
 import streamlit.components.v1 as stc 
-
+import streamlit as st
 
 ###### (1) 開始設定 ######
 html_temp = """
@@ -112,8 +112,15 @@ KBar_dic['amount']=np.array(KBar_amount_list)
 
 Date = start_date.strftime("%Y-%m-%d")
 
-st.subheader("設定一根 K 棒的時間長度(月)")
-cycle_duration = st.number_input('輸入一根 K 棒的時間長度(單位:月, 一年=12個月)',value=12, key="KBar_duration")
+time_units = ["分鐘", "小時", "天"]
+selected_unit = st.selectbox("选择时间单位", time_units)
+if selected_unit == "分钟":
+    unit_conversion = 1
+elif selected_unit == "小时":
+    unit_conversion = 60
+else:
+    unit_conversion = 1440 
+cycle_duration = st.number_input('輸入一根 K 棒的時間長度(單位:分鐘, 一日=1440分鐘)', key="KBar_duration")
 cycle_duration = int(cycle_duration)
 #cycle_duration = 1440   ## 可以改成你想要的 KBar 週期
 #KBar = indicator_f_Lo2.KBar(Date,'time',2)
