@@ -22,7 +22,7 @@ class KBar():
     # 更新最新報價
     def AddPrice(self,time, open_price, close_price, low_price, high_price,volume):
         # 同一根K棒
-        if time <= self.current:
+        if time < self.current:
             # 更新收盤價
             self.TAKBar['close'][-1] = close_price
             # 更新成交量
